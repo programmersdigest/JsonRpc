@@ -1,3 +1,4 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/github/programmersdigest/JsonRpc?branch=release&svg=true)](https://ci.appveyor.com/api/projects/status/github/programmersdigest/JsonRpc?branch=release&svg=true)
 # JsonRpc
 An implementation of the JSON-RPC 2.0 protocol.
 
