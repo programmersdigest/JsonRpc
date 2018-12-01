@@ -13,8 +13,8 @@ namespace programmersdigest.JsonRpc.Tests
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_SendCallbackIsNull_ShouldThrowArgumentNullException()
         {
-            Action<byte[]> sendCallback = null;
-            Func<byte[]> receiveCallback = () => new byte[0];
+            JsonRpcSendCallback sendCallback = null;
+            JsonRpcReceiveCallback receiveCallback = () => (new byte[0], null);
 
             new JsonRpc(sendCallback, receiveCallback);
         }
@@ -23,8 +23,8 @@ namespace programmersdigest.JsonRpc.Tests
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_ReceiveCallbackIsNull_ShouldThrowArgumentNullException()
         {
-            Action<byte[]> sendCallback = (d) => { };
-            Func<byte[]> receiveCallback = null;
+            JsonRpcSendCallback sendCallback = (d, s) => { };
+            JsonRpcReceiveCallback receiveCallback = null;
 
             new JsonRpc(sendCallback, receiveCallback);
         }
@@ -37,25 +37,25 @@ namespace programmersdigest.JsonRpc.Tests
         {
             string sentJson = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentJson = Encoding.UTF8.GetString(data);
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
-                return new byte[0];
+                return (new byte[0], null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
 
             if (parameters == null)
             {
-                jsonRpcClient.Notify(method);
+                jsonRpcClient.Notify(method, null);
             }
             else
             {
-                jsonRpcClient.Notify(method, parameters);
+                jsonRpcClient.Notify(method, null, parameters);
             }
 
             Assert.AreEqual(expectedJson, sentJson);
@@ -70,31 +70,37 @@ namespace programmersdigest.JsonRpc.Tests
             string sentJson = null;
             string sentId = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentJson = Encoding.UTF8.GetString(data);
                 sentId = Regex.Match(sentJson, @"""id"":""(.*?)""").Groups[1].Value;
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 if (sentId != null)
                 {
-                    return Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""result"":""Test"",""id"":""" + sentId + @"""}");
+                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""result"":""Test"",""id"":""" + sentId + @"""}");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
 
             if (parameters == null)
             {
-                jsonRpcClient.Call(method);
+                jsonRpcClient.Call(method, null);
             }
             else
             {
-                jsonRpcClient.Call(method, parameters);
+                jsonRpcClient.Call(method, null, parameters);
             }
 
             expectedJson = expectedJson.Replace("@id", sentId);
@@ -109,21 +115,27 @@ namespace programmersdigest.JsonRpc.Tests
             var responseSentEvent = new ManualResetEvent(false);
             string sentResponse = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentResponse = Encoding.UTF8.GetString(data);
                 responseSentEvent.Set();
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 if (!requestReceived)
                 {
                     requestReceived = true;
-                    return Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""test"",""id"":123}");
+                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""test"",""id"":123}");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
@@ -141,21 +153,27 @@ namespace programmersdigest.JsonRpc.Tests
             var responseSentEvent = new ManualResetEvent(false);
             string sentResponse = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentResponse = Encoding.UTF8.GetString(data);
                 responseSentEvent.Set();
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 if (!requestReceived)
                 {
                     requestReceived = true;
-                    return Encoding.UTF8.GetBytes(@"[]");
+                    data = Encoding.UTF8.GetBytes(@"[]");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
@@ -173,21 +191,27 @@ namespace programmersdigest.JsonRpc.Tests
             var responseSentEvent = new ManualResetEvent(false);
             string sentResponse = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentResponse = Encoding.UTF8.GetString(data);
                 responseSentEvent.Set();
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 if (!requestReceived)
                 {
                     requestReceived = true;
-                    return Encoding.UTF8.GetBytes(@"[1,2,3]");
+                    data = Encoding.UTF8.GetBytes(@"[1,2,3]");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
@@ -206,22 +230,28 @@ namespace programmersdigest.JsonRpc.Tests
             var responseSentEvent = new ManualResetEvent(false);
             string sentResponse = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentResponse = Encoding.UTF8.GetString(data);
                 responseSentEvent.Set();
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 methodRegisteredEvent.WaitOne();
                 if (!requestReceived)
                 {
                     requestReceived = true;
-                    return Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""TestMethod"",""params"":[123,""TestParam""],""id"":123}");
+                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""TestMethod"",""params"":[123,""TestParam""],""id"":123}");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
@@ -242,22 +272,28 @@ namespace programmersdigest.JsonRpc.Tests
             var responseSentEvent = new ManualResetEvent(false);
             string sentResponse = null;
 
-            void sendCallback(byte[] data)
+            void sendCallback(byte[] data, object state)
             {
                 sentResponse = Encoding.UTF8.GetString(data);
                 responseSentEvent.Set();
             }
 
-            byte[] receiveCallback()
+            (byte[], object) receiveCallback()
             {
+                byte[] data;
+
                 methodRegisteredEvent.WaitOne();
                 if (!requestReceived)
                 {
                     requestReceived = true;
-                    return Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""TestMethod"",""params"":[123,""TestParam""],""id"":123}");
+                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""TestMethod"",""params"":[123,""TestParam""],""id"":123}");
+                }
+                else
+                {
+                    data = new byte[0];
                 }
 
-                return new byte[0];
+                return (data, null);
             }
 
             var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);

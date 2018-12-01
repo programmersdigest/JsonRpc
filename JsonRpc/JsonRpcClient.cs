@@ -9,25 +9,25 @@ namespace programmersdigest.JsonRpc
 {
     internal class JsonRpcClient
     {
-        private readonly Action<object> _sendDataCallback;
+        private readonly Action<object, object> _sendDataCallback;
         private readonly ConcurrentDictionary<string, Action<JsonRpcResponse>> _responseCallbacks = new ConcurrentDictionary<string, Action<JsonRpcResponse>>();
 
-        public JsonRpcClient(Action<object> sendDataCallback)
+        public JsonRpcClient(Action<object, object> sendDataCallback)
         {
             _sendDataCallback = sendDataCallback;
         }
 
-        public void Notify(string method, params object[] parameters)
+        public void Notify(string method, object state, params object[] parameters)
         {
             var request = new JsonRpcRequest
             {
                 method = method,
                 @params = parameters.Any() ? parameters : null
             };
-            _sendDataCallback(request);
+            _sendDataCallback(request, state);
         }
 
-        public object Call(string method, params object[] parameters)
+        public object Call(string method, object state, params object[] parameters)
         {
             var resetEvent = new ManualResetEvent(false);
             JsonRpcResponse response = null;
@@ -50,7 +50,7 @@ namespace programmersdigest.JsonRpc
                 @params = parameters.Any() ? parameters : null,
                 id = id
             };
-            _sendDataCallback(request);
+            _sendDataCallback(request, state);
 
             if (!resetEvent.WaitOne(1000))
             {

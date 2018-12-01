@@ -9,16 +9,19 @@ using System.Threading;
 
 namespace programmersdigest.JsonRpc
 {
+    public delegate void JsonRpcSendCallback(byte[] data, object state);
+    public delegate (byte[] data, object state) JsonRpcReceiveCallback();
+    
     public class JsonRpc
     {
-        private readonly Action<byte[]> _sendCallback;
-        private readonly Func<byte[]> _receiveCallback;
+        private readonly JsonRpcSendCallback _sendCallback;
+        private readonly JsonRpcReceiveCallback _receiveCallback;
 
         private readonly JsonRpcServer _jsonRpcServer;
         private readonly JsonRpcClient _jsonRpcClient;
         private readonly WorkerThread _receiveThread;
 
-        public JsonRpc(Action<byte[]> sendCallback, Func<byte[]> receiveCallback)
+        public JsonRpc(JsonRpcSendCallback sendCallback, JsonRpcReceiveCallback receiveCallback)
         {
             _sendCallback = sendCallback ?? throw new ArgumentNullException(nameof(sendCallback));
             _receiveCallback = receiveCallback ?? throw new ArgumentNullException(nameof(receiveCallback));
@@ -39,35 +42,35 @@ namespace programmersdigest.JsonRpc
             _jsonRpcServer.Unregister(method);
         }
 
-        public void Notify(string method, params object[] parameters)
+        public void Notify(string method, object state, params object[] parameters)
         {
-            _jsonRpcClient.Notify(method, parameters);
+            _jsonRpcClient.Notify(method, state, parameters);
         }
 
-        public object Call(string method, params object[] parameters)
+        public object Call(string method, object state, params object[] parameters)
         {
-            return _jsonRpcClient.Call(method, parameters);
+            return _jsonRpcClient.Call(method, state, parameters);
         }
 
-        private void SendData(object message)
+        private void SendData(object message, object state)
         {
             var json = JsonConvert.SerializeObject(message);
             var bytes = Encoding.UTF8.GetBytes(json);
 
-            _sendCallback(bytes);
+            _sendCallback(bytes, state);
         }
 
         private void ReceiveThreadMethod(CancellationToken cancellationToken)
         {
             try
             {
-                var data = _receiveCallback();
+                var (data, state) = _receiveCallback();
                 if (data.Length <= 0)
                 {
                     return;     // We received nothing.
                 }
 
-                ProcessReceivedData(data);
+                ProcessReceivedData(data, state);
             }
             catch (Exception)
             {
@@ -75,7 +78,7 @@ namespace programmersdigest.JsonRpc
             }
         }
 
-        private void ProcessReceivedData(byte[] data)
+        private void ProcessReceivedData(byte[] data, object state)
         {
             JToken jToken;
             try
@@ -85,33 +88,33 @@ namespace programmersdigest.JsonRpc
             }
             catch (Exception)
             {
-                SendData(new JsonRpcResponse(null, JsonRpcError.CODE_PARSE_ERROR, "Unable to parse request message."));
+                SendData(new JsonRpcResponse(null, JsonRpcError.CODE_PARSE_ERROR, "Unable to parse request message."), state);
                 return;
             }
 
             switch (jToken)
             {
                 case JObject jObject:
-                    ProcessMessageAndRespond(jObject);
+                    ProcessMessageAndRespond(jObject, state);
                     break;
                 case JArray jArray:
-                    ProcessBatchAndRespond(jArray);
+                    ProcessBatchAndRespond(jArray, state);
                     break;
             }
         }
 
-        private void ProcessBatchAndRespond(JArray jArray)
+        private void ProcessBatchAndRespond(JArray jArray, object state)
         {
             if (jArray.Count <= 0)
             {
                 var response = new JsonRpcResponse(null, JsonRpcError.CODE_INVALID_REQUEST, "Request array must not be empty.");
-                SendData(response);
+                SendData(response, state);
 
                 return;
             }
 
             var responseArray = ProcessBatch(jArray);
-            SendData(responseArray);
+            SendData(responseArray, state);
         }
 
         private List<JsonRpcResponse> ProcessBatch(JArray jArray)
@@ -136,12 +139,12 @@ namespace programmersdigest.JsonRpc
             return result;
         }
 
-        private void ProcessMessageAndRespond(JObject jObject)
+        private void ProcessMessageAndRespond(JObject jObject, object state)
         {
             var response = ProcessMessage(jObject);
             if (response != null)
             {
-                SendData(response);
+                SendData(response, state);
             }
         }
 
