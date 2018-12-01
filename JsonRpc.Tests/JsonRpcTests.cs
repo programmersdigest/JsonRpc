@@ -9,6 +9,8 @@ namespace programmersdigest.JsonRpc.Tests
     [TestClass]
     public class JsonRpcTests
     {
+        #region Constructor
+
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
         public void Constructor_SendCallbackIsNull_ShouldThrowArgumentNullException()
@@ -27,6 +29,56 @@ namespace programmersdigest.JsonRpc.Tests
             JsonRpcReceiveCallback receiveCallback = null;
 
             new JsonRpc(sendCallback, receiveCallback);
+        }
+
+        #endregion
+
+        #region Notify
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Notify_MethodIsNull_ShouldThrowArgumentNullException()
+        {
+            JsonRpcSendCallback sendCallback = (d, s) => { };
+            JsonRpcReceiveCallback receiveCallback = () => (new byte[0], null);
+
+            var jsonRpc = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpc.Notify(null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void Notify_MethodIsEmpty_ShouldThrowArgumentException()
+        {
+            JsonRpcSendCallback sendCallback = (d, s) => { };
+            JsonRpcReceiveCallback receiveCallback = () => (new byte[0], null);
+
+            var jsonRpc = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpc.Notify("");
+        }
+
+        [DataTestMethod]
+        [DataRow(int.MinValue)]
+        [DataRow("This is a Test")]
+        [DataRow(double.MaxValue)]
+        public void Notify_VariousStateValues_ShouldGiveStateToSendCallback(object expectedState)
+        {
+            object actualState = null;
+
+            void sendCallback(byte[] data, object state)
+            {
+                actualState = state;
+            }
+
+            (byte[], object) receiveCallback()
+            {
+                return (new byte[0], null);
+            }
+
+            var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpcClient.Notify("Test", null, expectedState);
+
+            Assert.AreEqual(expectedState, actualState);
         }
 
         [DataTestMethod]
@@ -51,14 +103,71 @@ namespace programmersdigest.JsonRpc.Tests
 
             if (parameters == null)
             {
-                jsonRpcClient.Notify(method, null);
+                jsonRpcClient.Notify(method);
             }
             else
             {
-                jsonRpcClient.Notify(method, null, parameters);
+                jsonRpcClient.Notify(method, parameters);
             }
 
             Assert.AreEqual(expectedJson, sentJson);
+        }
+
+        #endregion
+
+        #region Call
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Call_MethodIsNull_ShouldThrowArgumentNullException()
+        {
+            JsonRpcSendCallback sendCallback = (d, s) => { };
+            JsonRpcReceiveCallback receiveCallback = () => (new byte[0], null);
+
+            var jsonRpc = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpc.Call(null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void Call_MethodIsEmpty_ShouldThrowArgumentException()
+        {
+            JsonRpcSendCallback sendCallback = (d, s) => { };
+            JsonRpcReceiveCallback receiveCallback = () => (new byte[0], null);
+
+            var jsonRpc = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpc.Call("");
+        }
+
+        [DataTestMethod]
+        [DataRow(int.MinValue)]
+        [DataRow("This is a Test")]
+        [DataRow(double.MaxValue)]
+        public void Call_VariousStateValues_ShouldGiveStateToSendCallback(object expectedState)
+        {
+            object actualState = null;
+            string sentId = null;
+
+            void sendCallback(byte[] data, object state)
+            {
+                actualState = state;
+
+                var sentJson = Encoding.UTF8.GetString(data);
+                sentId = Regex.Match(sentJson, @"""id"":""(.*?)""").Groups[1].Value;
+            }
+
+            (byte[], object) receiveCallback()
+            {
+                var data = sentId != null
+                         ? Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""result"":""Test"",""id"":""" + sentId + @"""}")
+                         : new byte[0];
+                return (data, null);
+            }
+
+            var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpcClient.Call("Test", null, expectedState);
+
+            Assert.AreEqual(expectedState, actualState);
         }
 
         [DataTestMethod]
@@ -78,17 +187,9 @@ namespace programmersdigest.JsonRpc.Tests
 
             (byte[], object) receiveCallback()
             {
-                byte[] data;
-
-                if (sentId != null)
-                {
-                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""result"":""Test"",""id"":""" + sentId + @"""}");
-                }
-                else
-                {
-                    data = new byte[0];
-                }
-
+                var data = sentId != null
+                         ? Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""result"":""Test"",""id"":""" + sentId + @"""}")
+                         : new byte[0];
                 return (data, null);
             }
 
@@ -96,16 +197,20 @@ namespace programmersdigest.JsonRpc.Tests
 
             if (parameters == null)
             {
-                jsonRpcClient.Call(method, null);
+                jsonRpcClient.Call(method);
             }
             else
             {
-                jsonRpcClient.Call(method, null, parameters);
+                jsonRpcClient.Call(method, parameters);
             }
 
             expectedJson = expectedJson.Replace("@id", sentId);
             Assert.AreEqual(expectedJson, sentJson);
         }
+
+        #endregion
+
+        #region Receive
 
         [TestMethod]
         public void Receive_MethodDoesNotExist_ShouldReturnMethodNotFoundError()
@@ -304,5 +409,51 @@ namespace programmersdigest.JsonRpc.Tests
             Assert.AreEqual(@"{""jsonrpc"":""2.0"",""error"":{""code"":-32602,""message"":""The method has a different parameter count.""},""id"":123}",
                             sentResponse);
         }
+
+        [DataTestMethod]
+        [DataRow(int.MinValue)]
+        [DataRow("This is a Test")]
+        [DataRow(double.MaxValue)]
+        public void Receive_ReceiveCallbackProvidesState_SendCallbackShouldGetStateForResponse(object expectedState)
+        {
+            bool requestReceived = false;
+
+            var methodRegisteredEvent = new ManualResetEvent(false);
+            var responseSentEvent = new ManualResetEvent(false);
+            object actualState = null;
+
+            void sendCallback(byte[] data, object state)
+            {
+                actualState = state;
+                responseSentEvent.Set();
+            }
+
+            (byte[], object) receiveCallback()
+            {
+                byte[] data;
+
+                methodRegisteredEvent.WaitOne();
+                if (!requestReceived)
+                {
+                    requestReceived = true;
+                    data = Encoding.UTF8.GetBytes(@"{""jsonrpc"":""2.0"",""method"":""TestMethod"",""params"":[123,""TestParam""],""id"":123}");
+                }
+                else
+                {
+                    data = new byte[0];
+                }
+
+                return (data, expectedState);
+            }
+
+            var jsonRpcClient = new JsonRpc(sendCallback, receiveCallback);
+            jsonRpcClient.Register("TestMethod", new Action<int>((i) => { }));
+            methodRegisteredEvent.Set();
+
+            responseSentEvent.WaitOne();
+            Assert.AreEqual(expectedState, actualState);
+        }
+
+        #endregion
     }
 }

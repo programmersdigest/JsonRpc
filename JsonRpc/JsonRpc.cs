@@ -41,15 +41,15 @@ namespace programmersdigest.JsonRpc
         {
             _jsonRpcServer.Unregister(method);
         }
-
-        public void Notify(string method, object state, params object[] parameters)
+        
+        public void Notify(string method, object[] parameters = null, object state = null)
         {
-            _jsonRpcClient.Notify(method, state, parameters);
+            _jsonRpcClient.Notify(method, parameters, state);
         }
 
-        public object Call(string method, object state, params object[] parameters)
+        public object Call(string method, object[] parameters = null, object state = null)
         {
-            return _jsonRpcClient.Call(method, state, parameters);
+            return _jsonRpcClient.Call(method, parameters, state);
         }
 
         private void SendData(object message, object state)

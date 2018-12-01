@@ -17,18 +17,38 @@ namespace programmersdigest.JsonRpc
             _sendDataCallback = sendDataCallback;
         }
 
-        public void Notify(string method, object state, params object[] parameters)
+        public void Notify(string method, object[] parameters, object state)
         {
+            if (method == null)
+            {
+                throw new ArgumentNullException(nameof(method));
+            }
+            if (method == "")
+            {
+                throw new ArgumentException(nameof(method));
+            }
+
             var request = new JsonRpcRequest
             {
-                method = method,
-                @params = parameters.Any() ? parameters : null
+                method = method
             };
+            if (parameters != null && parameters.Any()) {
+                request.@params = parameters;
+            }
             _sendDataCallback(request, state);
         }
 
-        public object Call(string method, object state, params object[] parameters)
+        public object Call(string method, object[] parameters, object state)
         {
+            if (method == null)
+            {
+                throw new ArgumentNullException(nameof(method));
+            }
+            if (method == "")
+            {
+                throw new ArgumentException(nameof(method));
+            }
+            
             var resetEvent = new ManualResetEvent(false);
             JsonRpcResponse response = null;
 
@@ -47,9 +67,12 @@ namespace programmersdigest.JsonRpc
             var request = new JsonRpcRequest
             {
                 method = method,
-                @params = parameters.Any() ? parameters : null,
                 id = id
             };
+            if (parameters != null && parameters.Any())
+            {
+                request.@params = parameters;
+            }
             _sendDataCallback(request, state);
 
             if (!resetEvent.WaitOne(1000))
