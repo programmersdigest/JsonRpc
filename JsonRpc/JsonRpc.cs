@@ -11,7 +11,7 @@ namespace programmersdigest.JsonRpc
 {
     public delegate void JsonRpcSendCallback(byte[] data, object state);
     public delegate (byte[] data, object state) JsonRpcReceiveCallback();
-    
+
     public class JsonRpc
     {
         private readonly JsonRpcSendCallback _sendCallback;
@@ -20,6 +20,12 @@ namespace programmersdigest.JsonRpc
         private readonly JsonRpcServer _jsonRpcServer;
         private readonly JsonRpcClient _jsonRpcClient;
         private readonly WorkerThread _receiveThread;
+
+        public int RequestTimeout
+        {
+            get { return _jsonRpcClient.RequestTimeout; }
+            set { _jsonRpcClient.RequestTimeout = value; }
+        }
 
         public JsonRpc(JsonRpcSendCallback sendCallback, JsonRpcReceiveCallback receiveCallback)
         {
@@ -41,7 +47,7 @@ namespace programmersdigest.JsonRpc
         {
             _jsonRpcServer.Unregister(method);
         }
-        
+
         public void Notify(string method, object[] parameters = null, object state = null)
         {
             _jsonRpcClient.Notify(method, parameters, state);

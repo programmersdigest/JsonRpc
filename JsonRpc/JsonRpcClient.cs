@@ -12,6 +12,8 @@ namespace programmersdigest.JsonRpc
         private readonly Action<object, object> _sendDataCallback;
         private readonly ConcurrentDictionary<string, Action<JsonRpcResponse>> _responseCallbacks = new ConcurrentDictionary<string, Action<JsonRpcResponse>>();
 
+        public int RequestTimeout { get; set; } = 10000;
+
         public JsonRpcClient(Action<object, object> sendDataCallback)
         {
             _sendDataCallback = sendDataCallback;
@@ -75,7 +77,7 @@ namespace programmersdigest.JsonRpc
             }
             _sendDataCallback(request, state);
 
-            if (!resetEvent.WaitOne(1000))
+            if (!resetEvent.WaitOne(RequestTimeout))
             {
                 _responseCallbacks.TryRemove(id, out var junk);
                 throw new TimeoutException("The server did not respond within the given timeout.");
